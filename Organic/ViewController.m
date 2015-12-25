@@ -12,14 +12,19 @@
 @interface ViewController ()
 
 @property (nonatomic, strong) UIView *overlay;
-@property (nonatomic, strong) UIButton *scanButton;
+@property (nonatomic, strong) UIView *startScanView;
 @property (nonatomic, strong) UIView *scanningVisualizationView;
 @property (nonatomic, strong) UIView *resultView;
 
+@property (nonatomic, strong) NSNumber *status;
 @end
 
 @implementation ViewController
 SystemSoundID scanSound;
+
+#define STATUS_RANDOM 0
+#define STATUS_NOT_ORGANIC 1
+#define STATUS_ORGANIC 2
 
 - (void)viewDidAppear:(BOOL)animated
 {
@@ -50,34 +55,55 @@ SystemSoundID scanSound;
     picker.cameraViewTransform = CGAffineTransformMakeTranslation(0, (screenBounds.height - camViewHeight) / 2.0);
     picker.cameraViewTransform = CGAffineTransformScale(picker.cameraViewTransform, scale, scale);
     
-    //Set the overlay
-    [self setupOverlay:picker];
+    // Setup the overlay
+    self.overlay = [[UIView alloc] initWithFrame:CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height)];
+    picker.cameraOverlayView = self.overlay;
+    
+    // Reset the scan value
+    self.status = @(0);
+    
+    //Setup the start scan view
+    [self setupStartScanView];
     
     //Show the view controller
     [self presentViewController:picker animated:NO completion:NULL];
 }
 
-- (void)setupOverlay:(UIImagePickerController *)picker
+- (void)setupStartScanView
 {
-    // Setup the overlay
-    self.overlay = [[UIView alloc] initWithFrame:CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height)];
 
-    //Add a button to start the scan
-    self.scanButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.scanButton.frame = CGRectMake((self.view.frame.size.width-185)/2, self.view.frame.size.height-100, 185, 41); // Image is 75x75, we want it centered on the screen
-    [self.scanButton setBackgroundImage:[UIImage imageNamed:@"Scan.png"] forState:UIControlStateNormal];
-    [self.scanButton addTarget:self action:@selector(scanButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
-
-    [self.overlay addSubview:self.scanButton];
+    NSLog(@"Setting up start scan view");
+    self.startScanView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height)];
     
-    picker.cameraOverlayView = self.overlay;
+    //Add a button to start the scan
+    UIButton *scanButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    scanButton.frame = CGRectMake((self.view.frame.size.width-185)/2, self.view.frame.size.height-100, 185, 41); // Image is 75x75, we want it centered on the screen
+    [scanButton setBackgroundImage:[UIImage imageNamed:@"Scan.png"] forState:UIControlStateNormal];
+    [scanButton addTarget:self action:@selector(scanButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
+    [self.startScanView addSubview:scanButton];
+
+    
+    //Left Button
+    UIButton *leftButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    leftButton.frame = CGRectMake(0, 367, 54, 186);
+    [leftButton addTarget:self action:@selector(leftButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
+    [self.startScanView  addSubview:leftButton];
+    
+    //Right Button
+    UIButton *rightButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    rightButton.frame = CGRectMake(268, 367, 54, 186);
+    [rightButton addTarget:self action:@selector(rightButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
+    [self.startScanView  addSubview:rightButton];
+    
+    // Add to overlay
+    [self.overlay addSubview:self.startScanView];
 }
 
 
 - (void)scanButtonClicked:(id)sender
 {
-    // Disable Button
-    self.scanButton.hidden = YES;
+    // Remove View
+    [self.startScanView removeFromSuperview];;
     
     self.scanningVisualizationView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.height)];
     
@@ -98,9 +124,24 @@ SystemSoundID scanSound;
         
     }];
     
+    
+    BOOL showOrganic;
+    if([self.status intValue] == STATUS_ORGANIC)  {
+        showOrganic = YES;
+        NSLog(@"STATUS ORGANIC");
+    }
+    else if([self.status intValue] == STATUS_NOT_ORGANIC){
+        showOrganic = NO;
+        NSLog(@"STATUS NOT ORGANIC");
+    }
+    else {
+        showOrganic = randomBool();
+        NSLog(@"STATUS Random");
+    }
+    
     // After 5 seconds
     #define SCAN_TIME 3
-    if(randomBool())
+    if(showOrganic)
         [self performSelector:@selector(scanResultOrganic) withObject:nil afterDelay:SCAN_TIME];
     else
         [self performSelector:@selector(scanResultNotOrganic) withObject:nil afterDelay:SCAN_TIME];
@@ -113,6 +154,18 @@ SystemSoundID scanSound;
     AudioServicesPlaySystemSound(scanSound);
 }
 
+// Not organic
+- (void)leftButtonClicked:(id)sender
+{
+    NSLog(@"Left button clicked!");
+    self.status = @(STATUS_NOT_ORGANIC);
+}
+
+- (void)rightButtonClicked:(id)sender
+{
+    NSLog(@"Right Button Clicked!");
+    self.status = @(STATUS_ORGANIC);
+}
 
 /* Return a random integer number between low and high inclusive */
 int randomInt(int low, int high)
@@ -217,6 +270,7 @@ BOOL randomBool()
 
     [self.resultView removeFromSuperview];
     
-    self.scanButton.hidden = NO;
+    self.status = @(STATUS_RANDOM);
+    [self.overlay addSubview:self.startScanView];
 }
 @end
